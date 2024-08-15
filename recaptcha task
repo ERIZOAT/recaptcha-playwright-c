@@ -1,0 +1,38 @@
+#include <iostream>
+#include <cpr/cpr.h>
+#include <json/json.h>
+
+std::string createTask(const std::string& apiKey, const std::string& websiteURL, const std::string& websiteKey) {
+    Json::Value requestBody;
+    requestBody["clientKey"] = apiKey;
+    requestBody["task"]["type"] = "ReCaptchaV2Task";
+    requestBody["task"]["websiteURL"] = websiteURL;
+    requestBody["task"]["websiteKey"] = websiteKey;
+
+    Json::StreamWriterBuilder writer;
+    std::string requestBodyStr = Json::writeString(writer, requestBody);
+
+    cpr::Response response = cpr::Post(
+        cpr::Url{"https://api.capsolver.com/createTask"},
+        cpr::Body{requestBodyStr},
+        cpr::Header{{"Content-Type", "application/json"}}
+    );
+
+    Json::CharReaderBuilder reader;
+    Json::Value responseBody;
+    std::string errs;
+    std::istringstream s(response.text);
+    std::string taskId;
+
+    if (Json::parseFromStream(reader, s, &responseBody, &errs)) {
+        if (responseBody["errorId"].asInt() == 0) {
+            taskId = responseBody["taskId"].asString();
+        } else {
+            std::cerr << "Error: " << responseBody["errorCode"].asString() << std::endl;
+        }
+    } else {
+        std::cerr << "Failed to parse response: " << errs << std::endl;
+    }
+
+    return taskId;
+}
