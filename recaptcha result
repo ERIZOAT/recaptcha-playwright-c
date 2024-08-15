@@ -1,0 +1,42 @@
+#include <iostream>
+#include <cpr/cpr.h>
+#include <json/json.h>
+
+std::string getTaskResult(const std::string& apiKey, const std::string& taskId) {
+    Json::Value requestBody;
+    requestBody["clientKey"] = apiKey;
+    requestBody["taskId"] = taskId;
+
+    Json::StreamWriterBuilder writer;
+    std::string requestBodyStr = Json::writeString(writer, requestBody);
+
+    while (true) {
+        cpr::Response response = cpr::Post(
+            cpr::Url{"https://api.capsolver.com/getTaskResult"},
+            cpr::Body{requestBodyStr},
+            cpr::Header{{"Content-Type", "application/json"}}
+        );
+
+        Json::CharReaderBuilder reader;
+        Json::Value responseBody;
+        std::string errs;
+        std::istringstream s(response.text);
+
+        if (Json::parseFromStream(reader, s, &responseBody, &errs)) {
+            if (responseBody["status"].asString() == "ready") {
+                return responseBody["solution"]["gRecaptchaResponse"].asString();
+            } else if (responseBody["status"].asString() == "processing") {
+                std::cout << "Task is still processing, waiting for 5 seconds..." << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+            } else {
+                std::cerr << "Error: " << responseBody["errorCode"].asString() << std::endl;
+                break;
+            }
+        } else {
+            std::cerr << "Failed to parse response: " << errs << std::endl;
+            break;
+        }
+    }
+
+    return "";
+}
